@@ -16,7 +16,7 @@ select * from ag_completion_records where ag_user_id = 5;
 SELECT COUNT(*) AS total_records, COUNT(DISTINCT(ag_record_id)) AS unique_records
 FROM ag_completion_records;
 
--- Since both the values are same, primary key is working correctly
+-- Since both the values are same, prim-ary key is working correctly
 
 -- 4. Confirm PRIMARY KEY Constraint Exists
 SHOW KEYS FROM ag_completion_records WHERE Key_name = 'PRIMARY';
@@ -49,12 +49,13 @@ AND column_name NOT IN (
 
 ALTER TABLE ag_completion_records 
 MODIFY ag_COMPLETION_DATE DATE NOT NULL;
-
+select ag_COMPLETION_DATE from ag_completion_records;
 -- 7.2. Adding check constraint to completion records since the data needs to be within 0 to 100%
 
 ALTER TABLE ag_completion_records 
 ADD CONSTRAINT check_progress 
 CHECK (ag_PROGRESS_PERCENTAGE BETWEEN 0 AND 100);
+select ag_PROGRESS_PERCENTAGE from ag_completion_records;
 
 -- 8. Foreign Key constraint check
 
@@ -164,6 +165,23 @@ ALTER TABLE ag_users
 MODIFY ag_user_first_name VARCHAR(50) NOT NULL,
 MODIFY ag_user_email VARCHAR(60) NOT NULL,
 MODIFY ag_user_last_name VARCHAR(50) NOT NULL;
+ 
+ 
+-- 1️⃣ Check if `ag_user_first_name` is NOT NULL  
+SELECT COLUMN_NAME, IS_NULLABLE, DATA_TYPE, CHARACTER_MAXIMUM_LENGTH  
+FROM information_schema.columns  
+WHERE table_name = 'ag_users' AND COLUMN_NAME = 'ag_user_first_name';  
+
+-- 2️⃣ Check if `ag_user_email` is NOT NULL  
+SELECT COLUMN_NAME, IS_NULLABLE, DATA_TYPE, CHARACTER_MAXIMUM_LENGTH  
+FROM information_schema.columns  
+WHERE table_name = 'ag_users' AND COLUMN_NAME = 'ag_user_email';  
+
+-- 3️⃣ Check if `ag_user_last_name` is NOT NULL  
+SELECT COLUMN_NAME, IS_NULLABLE, DATA_TYPE, CHARACTER_MAXIMUM_LENGTH  
+FROM information_schema.columns  
+WHERE table_name = 'ag_users' AND COLUMN_NAME = 'ag_user_last_name'; 
+
 
 -- 7.2. Adding CHECK constraint to enforce valid email format (Only syntactic check)
 ALTER TABLE ag_users 
@@ -236,6 +254,10 @@ AND column_name NOT IN (
 ALTER TABLE ag_categories 
 MODIFY ag_CATEGORY_DESCRIPTION VARCHAR(100) NOT NULL;
 
+SELECT COLUMN_NAME, IS_NULLABLE, DATA_TYPE, CHARACTER_MAXIMUM_LENGTH  
+FROM information_schema.columns  
+WHERE table_name = 'ag_categories' AND COLUMN_NAME = 'ag_CATEGORY_DESCRIPTION';
+
 -- 8. Foreign Key constraint check (If this table references another table)
 
 -- No foreign keys in this table, skipping this step
@@ -297,10 +319,36 @@ ALTER TABLE ag_courses
 MODIFY ag_COURSE_NAME VARCHAR(255) NOT NULL,
 MODIFY ag_COURSE_RATING VARCHAR(255) NOT NULL;
 
+SELECT COLUMN_NAME, IS_NULLABLE, DATA_TYPE, CHARACTER_MAXIMUM_LENGTH  
+FROM information_schema.columns  
+WHERE table_name = 'ag_courses'  
+AND COLUMN_NAME IN ('ag_COURSE_NAME', 'ag_COURSE_RATING');
+
 -- 7.2. Ensuring Course Rating is Within Valid Range (0-5)
 ALTER TABLE ag_courses 
 ADD CONSTRAINT check_course_rating 
 CHECK (ag_COURSE_RATING BETWEEN 0 AND 5);
+
+DELIMITER //
+
+CREATE TRIGGER enforce_course_rating  
+BEFORE INSERT ON ag_courses  
+FOR EACH ROW  
+BEGIN  
+    IF NEW.ag_COURSE_RATING < 0 OR NEW.ag_COURSE_RATING > 5 THEN  
+        SIGNAL SQLSTATE '45000'  
+        SET MESSAGE_TEXT = 'Invalid course rating! Must be between 0 and 5.';  
+    END IF;  
+END;  
+
+//  
+DELIMITER ;
+
+-- CHECKING TO SEE IF WE CAN INSERT INVALID VALUES
+INSERT INTO ag_courses (ag_COURSE_ID, ag_COURSE_NAME, ag_CATEGORY_ID, ag_COURSE_RATING)  
+VALUES (999, 'Test Course', 1, 6.5);
+
+-- THE ERROR MESSAGE IS GETTING DISPLAYED: HENCE WRONG VALUES CANT BE INSERTED
 
 -- 8. Foreign Key constraint check
 
@@ -390,10 +438,35 @@ ALTER TABLE ag_reviews
 MODIFY ag_REVIEW TEXT NOT NULL,
 MODIFY ag_REVIEW_RATING varchar (2) NOT NULL;
 
+SELECT COLUMN_NAME, IS_NULLABLE, DATA_TYPE, CHARACTER_MAXIMUM_LENGTH  
+FROM information_schema.columns  
+WHERE table_name = 'ag_reviews'  
+AND COLUMN_NAME IN ('ag_REVIEW', 'ag_REVIEW_RATING');
+
 -- 7.2. Ensuring Review Rating is Within Valid Range (1-5)
 ALTER TABLE ag_reviews 
 ADD CONSTRAINT check_review_rating 
 CHECK (ag_REVIEW_RATING BETWEEN 1 AND 5);
+
+DELIMITER //
+
+CREATE TRIGGER enforce_review_rating  
+BEFORE INSERT ON ag_reviews  
+FOR EACH ROW  
+BEGIN  
+    IF NEW.ag_REVIEW_RATING < 1 OR NEW.ag_REVIEW_RATING > 5 THEN  
+        SIGNAL SQLSTATE '45000'  
+        SET MESSAGE_TEXT = 'Invalid review rating! Must be between 1 and 5.';  
+    END IF;  
+END;  
+
+//  
+DELIMITER ;
+
+INSERT INTO ag_reviews (ag_REVIEW_ID, ag_USER_ID, ag_COURSE_ID, ag_REVIEW, ag_REVIEW_RATING)  
+VALUES (999, 1, 1, 'Great course!', 6);
+
+-- INVALID VALUE INSERTED, HENCE TRIGGER ACTIVATED
 
 -- 8. Foreign Key constraint check
 
@@ -496,6 +569,10 @@ AND column_name NOT IN (
 ALTER TABLE ag_course_outlines 
 MODIFY ag_COURSE_OUTLINE_CONTENT TEXT NOT NULL;
 
+SELECT COLUMN_NAME, IS_NULLABLE, DATA_TYPE, CHARACTER_MAXIMUM_LENGTH  
+FROM information_schema.columns  
+WHERE table_name = 'ag_course_outlines' AND COLUMN_NAME = 'ag_COURSE_OUTLINE_CONTENT';
+
 -- 8. Foreign Key constraint check
 
 -- 8.1. Check for outlines with non-existent user IDs
@@ -574,6 +651,10 @@ AND column_name NOT IN (
 
 ALTER TABLE ag_recommendations 
 MODIFY ag_RECOMMENDATION_LOGIC TEXT NOT NULL;
+
+SELECT COLUMN_NAME, IS_NULLABLE, DATA_TYPE, CHARACTER_MAXIMUM_LENGTH  
+FROM information_schema.columns  
+WHERE table_name = 'ag_recommendations' AND COLUMN_NAME = 'ag_RECOMMENDATION_LOGIC';
 
 -- 8. Foreign Key constraint check
 
@@ -661,6 +742,26 @@ AND column_name NOT IN (
 ALTER TABLE ag_outline_recommendations 
 ADD CONSTRAINT check_match_score 
 CHECK (ag_MATCH_SCORE BETWEEN 0 AND 100);
+
+DELIMITER //
+
+CREATE TRIGGER enforce_match_score  
+BEFORE INSERT ON ag_outline_recommendations  
+FOR EACH ROW  
+BEGIN  
+    IF NEW.ag_MATCH_SCORE < 0 OR NEW.ag_MATCH_SCORE > 100 THEN  
+        SIGNAL SQLSTATE '45000'  
+        SET MESSAGE_TEXT = 'Invalid match score! Must be between 0 and 100.';  
+    END IF;  
+END;  
+
+//  
+DELIMITER ;
+
+INSERT INTO ag_outline_recommendations (ag_RECOMMENDATION_ID, ag_OUTLINE_ID, ag_COURSE_ID, ag_MATCH_SCORE)  
+VALUES (999, 1, 1, 150);
+
+ -- cant insert invalid values hence trigger activated
 
 -- 8. Foreign Key constraint check
 
